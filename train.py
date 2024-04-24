@@ -138,14 +138,15 @@ class TSPModel(pl.LightningModule):
             self.train_start_time = time.time()
     
     def on_train_epoch_end(self):
-        outputs = self.all_gather(self.train_outputs)
+        outputs = self.all_gather(sum(self.train_outputs))
+        lengths = self.all_gather(len(self.train_outputs))
         self.train_outputs.clear()
         
         lr_scheduler = self.lr_schedulers() # manual backprop
         lr_scheduler.step() # manual backprop
         
         if self.trainer.is_global_zero:
-            train_loss = torch.stack(outputs).mean()
+            train_loss = (outputs * lengths).sum() / lengths.sum()
             train_time = time.time() - self.train_start_time
             self.print(
                 f"##############Train: Epoch {self.current_epoch}###################",
@@ -371,3 +372,5 @@ if __name__ == "__main__":
         callbacks=[checkpoint_callback],
         strategy="ddp_find_unused_parameters_true",
     )
+    trainer.fit(tsp_model)
+    

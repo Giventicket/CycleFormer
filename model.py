@@ -5,6 +5,12 @@ import numpy as np
 import math
 import copy
 
+from flash_attn.bert_padding import pad_input, unpad_input
+from flash_attn.flash_attn_interface import (
+    flash_attn_func,
+    flash_attn_varlen_kvpacked_func,
+)
+
 class EncoderDecoder(nn.Module):
     """
     A standard Encoder-Decoder architecture. Base for this and many
@@ -172,7 +178,7 @@ def attention(query, key, value, mask=None, dropout=None):
     return torch.matmul(p_attn, value), p_attn
 
 class MultiHeadedAttention(nn.Module):
-    def __init__(self, h, d_model, dropout=0.1):
+    def __init__(self, h, d_model, dropout=0.0):
         "Take in model size and number of heads."
         super(MultiHeadedAttention, self).__init__()
         assert d_model % h == 0
@@ -205,6 +211,48 @@ class MultiHeadedAttention(nn.Module):
         del key
         del value
         return self.linears[-1](x)
+
+class FlashMultiHeadedAttention(nn.Module):
+    def __init__(self, h, d_model, dropout=0.1):
+        "Take in model size and number of heads."
+        super(FlashMultiHeadedAttention, self).__init__()
+        assert d_model % h == 0
+        # We assume d_v always equals d_k
+        self.d_k = d_model // h
+        self.h = h
+        self.linears = clones(nn.Linear(d_model, d_model), 4)
+        self.dropout = dropout
+        
+    def forward(self, query, key, value, mask=None):
+        "Implements Figure 2"
+        nbatches = query.size(0)
+        bsz, q_len, _ = query.size()
+
+        # 1) Do all the linear projections in batch from d_model => h x d_k
+        q, k, v = [    # shape: (b, s, num_heads, head_dim)
+            lin(x).view(nbatches, -1, self.h, self.d_k).contiguous()
+            for lin, x in zip(self.linears, (query, key, value))
+        ]
+
+        # 2) Apply attention on all the projected vectors in batch.
+        # reference1: https://github.com/lm-sys/FastChat/blob/main/fastchat/train/llama_flash_attn_monkey_patch.py
+        # reference2: https://github.com/lm-sys/FastChat/blob/main/fastchat/train/llama2_flash_attn_monkey_patch.py
+        
+        attention_mask = mask
+        if attention_mask is None:
+            output = flash_attn_func(q, k, v, 0.0, softmax_scale=None, causal=False).view(
+                bsz, q_len, -1
+            )
+        else:
+            output = flash_attn_func(q, k, v, 0.0, softmax_scale=None, causal=True).view(
+                bsz, q_len, -1
+            )
+
+        output = output.view(nbatches, -1, self.h * self.d_k)
+        del query
+        del key
+        del value
+        return self.linears[-1](output)
 
 class PositionwiseFeedForward(nn.Module):
     "Implements FFN equation."
@@ -364,7 +412,8 @@ class DecoderCPE(nn.Module):
 def make_model(src_sz, tgt_sz, enc_num_layers=6, dec_num_layers=6, d_model=128, d_ff=512, h=8, dropout=0.1, mode = "xy_cat", share_lut=False, use_decoderCPE = False):
     "Helper: Construct a model from hyperparameters."
     c = copy.deepcopy
-    attn = MultiHeadedAttention(h, d_model)
+    # attn = MultiHeadedAttention(h, d_model)
+    attn = FlashMultiHeadedAttention(h, d_model)
     ff = PositionwiseFeedForward(d_model, d_ff, dropout)
     
     if share_lut:

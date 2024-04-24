@@ -138,14 +138,15 @@ class TSPModel(pl.LightningModule):
             self.train_start_time = time.time()
     
     def on_train_epoch_end(self):
-        outputs = self.all_gather(self.train_outputs)
+        outputs = self.all_gather(sum(self.train_outputs))
+        lengths = self.all_gather(len(self.train_outputs))
         self.train_outputs.clear()
         
         lr_scheduler = self.lr_schedulers() # manual backprop
         lr_scheduler.step() # manual backprop
         
         if self.trainer.is_global_zero:
-            train_loss = torch.stack(outputs).mean()
+            train_loss = (outputs * lengths).sum() / lengths.sum()
             train_time = time.time() - self.train_start_time
             self.print(
                 f"##############Train: Epoch {self.current_epoch}###################",
@@ -343,7 +344,7 @@ def parse_arguments():
 from discord_webhook import DiscordWebhook, DiscordEmbed
 
 def start_discord(cfg, v_num):
-    url = "https://discord.com/api/webhooks/1230053530966949970/PUiYwiueb0ozpaAldev9noi_LIqFX36M8mIa9UlYolt2Wx4g_NulM4C46ky1TOjxtsY1"
+    url = "https://discord.com/api/webhooks/1231575588091854939/UlCuJCo_R_0s0spOo4UPyO49GyBoT4uPuJ-YYFsr3UKmnDeK8oq_ZwknBxR4qwCcAA4V"
     webhook = DiscordWebhook(url=url)
 
     embed = DiscordEmbed(title="Train start", description=f"version_{v_num}", color="03b2f8")
@@ -359,7 +360,7 @@ def start_discord(cfg, v_num):
     response = webhook.execute()
 
 def end_discord(v_num, metrics=None, best_hit_ratio=None, elapsed_time=None):
-    url = "https://discord.com/api/webhooks/1230053530966949970/PUiYwiueb0ozpaAldev9noi_LIqFX36M8mIa9UlYolt2Wx4g_NulM4C46ky1TOjxtsY1"
+    url = "https://discord.com/api/webhooks/1231575588091854939/UlCuJCo_R_0s0spOo4UPyO49GyBoT4uPuJ-YYFsr3UKmnDeK8oq_ZwknBxR4qwCcAA4V"
     webhook = DiscordWebhook(url=url)
 
     embed = DiscordEmbed(title="Train End", description=f"version_{v_num}", color="03b2f8")
