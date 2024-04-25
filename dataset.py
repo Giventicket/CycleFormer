@@ -4,7 +4,6 @@ from model import subsequent_mask
 
 from tqdm import tqdm
 from pprint import pprint
-import random
 
 """
    src
@@ -27,6 +26,7 @@ class TSPDataset(Dataset):
         self.data_path = data_path
         self.tsp_instances = []
         self.tsp_tours = []
+        self.reversed_tsp_tours = []
 
         self._readDataFile()
         
@@ -73,10 +73,12 @@ class TSPDataset(Dataset):
                 reversed_tsp_tour = tsp_tour[1:].copy()
                 reversed_tsp_tour.reverse()
                 
+                
                 tsp_tour = torch.LongTensor(tsp_tour[:-1])
                 self.tsp_tours.append(tsp_tour)
                 
                 reversed_tsp_tour = torch.LongTensor(reversed_tsp_tour)
+                self.reversed_tsp_tours.append(reversed_tsp_tour)
         return
 
     def _process(self):
@@ -98,7 +100,7 @@ class TSPDataset(Dataset):
         return len(self.tsp_instances)
 
     def __getitem__(self, idx):
-        return self.src[idx], self.tgt[idx], self.tgt_y[idx], self.visited_mask[idx], self.ntokens[idx], self.tsp_tours[idx]
+        return self.src[idx], self.tgt[idx], self.tgt_y[idx], self.visited_mask[idx], self.ntokens[idx], self.tsp_tours[idx], self.reversed_tsp_tours[idx]
 
 
 def make_tgt_mask(tgt):
@@ -115,6 +117,7 @@ def collate_fn(batch):
     visited_mask = [ele[3] for ele in batch]
     ntokens = [ele[4] for ele in batch]
     tsp_tours = [ele[5] for ele in batch]
+    reversed_tsp_tours = [ele[6] for ele in batch]
 
     tgt = torch.stack(tgt, dim=0)
     tgt_y = torch.stack(tgt_y, dim=0)
@@ -127,6 +130,7 @@ def collate_fn(batch):
         "ntokens": torch.stack(ntokens, dim=0),
         "tgt_mask": make_tgt_mask(tgt),
         "tsp_tours": torch.stack(tsp_tours, dim=0),
+        "reversed_tsp_tours": torch.stack(reversed_tsp_tours, dim=0),
     }
 
 

@@ -1,10 +1,10 @@
 # train_data_path: ./tsp100_train_concorde_large.txt
-train_data_path: ./tsp100_train_concorde.txt
-val_data_path: ./tsp100_test_concorde.txt
-node_size: 100
+# val_data_path: ./tsp100_test_concorde.txt
+train_data_path: ./new_tour_20_double.txt
+val_data_path: ./reordered_tsp20_test_concorde.txt
+node_size: 20
 train_batch_size: 80
 val_batch_size: 6400
-# resume_checkpoint: /root/CycleFormer/logs/lightning_logs/version_1/checkpoints/TSP100-epoch=99-opt_gap=1.9825.ckpt
 resume_checkpoint: None
 gpus: [0, 1, 2, 3]
 max_epochs: 100
@@ -25,3 +25,4 @@ mode: "xy_cat"
 decoder_output_size: 2
 share_lut: True
 use_decoderCPE: False
+memo: flash attention
