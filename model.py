@@ -59,7 +59,7 @@ class EncoderDecoder(nn.Module):
         # tgt_embeddings = torch.zeros(B, V, E).to(device = device, dtype = whole_embeddings.dtype)
         # tgt_embeddings[batch_indices_valid, sequence_indices_valid, :] = whole_embeddings[batch_indices_valid, tgt_valid, :]
         
-        tgt_embeddings = torch.zeros(B, V, E).to(device = device, dtype =memory.dtype)
+        tgt_embeddings = torch.zeros(B, V, E).to(device=device, dtype=memory.dtype)
         tgt_embeddings[batch_indices_valid, sequence_indices_valid, :] = memory[batch_indices_valid, tgt_valid, :]
         tgt_embeddings = self.decoder_pe(tgt_embeddings)
         
@@ -137,8 +137,10 @@ class Decoder(nn.Module):
         self.norm = nn.LayerNorm(layer.size)
 
     def forward(self, x, memory, tgt_mask):
+        self.intermediates = []
         for layer in self.layers:
             x = layer(x, memory, tgt_mask)
+            self.intermediates.append(self.norm(x))
         return self.norm(x)
 
 class DecoderLayer(nn.Module):

@@ -113,9 +113,14 @@ class TSPModel(pl.LightningModule):
         self.model.train()
         out = self.model(src, tgt, tgt_mask) # [B, V, E]
         
-        loss = self.loss_compute(out, tgt_y, visited_mask, ntokens, self.model.comparison_matrix) # check! 
+        losses = []
+        for intermediate in self.model.decoder.intermediates:
+            loss = self.loss_compute(intermediate, tgt_y, visited_mask, ntokens, self.model.comparison_matrix)
+            losses.append(loss)
+        loss = sum(losses) / len(losses)
         
-
+        # loss = self.loss_compute(out, tgt_y, visited_mask, ntokens, self.model.comparison_matrix) # check! 
+        
         training_step_outputs = [l.item() for l in loss]
         self.train_outputs.extend(training_step_outputs)
 
@@ -146,7 +151,7 @@ class TSPModel(pl.LightningModule):
         lr_scheduler.step() # manual backprop
         
         if self.trainer.is_global_zero:
-            train_loss = (outputs * lengths).sum() / lengths.sum()
+            train_loss = outputs.sum() / lengths.sum()
             train_time = time.time() - self.train_start_time
             self.print(
                 f"##############Train: Epoch {self.current_epoch}###################",
@@ -311,7 +316,7 @@ class TSPModel(pl.LightningModule):
         return result
     
     def on_test_epoch_end(self):
-        corrects = self.all_gather(self.test_corrects)
+        corrects = self.all_gather(sum(self.test_corrects))
         optimal_tour_distances = self.all_gather(sum(self.test_optimal_tour_distances))
         predicted_tour_distances = self.all_gather(sum(self.test_predicted_tour_distances))
         
@@ -320,7 +325,6 @@ class TSPModel(pl.LightningModule):
         self.test_predicted_tour_distances.clear()
         
         if self.trainer.is_global_zero:
-            corrects = torch.stack(corrects)
             correct = corrects.sum().item()
             total = self.cfg.node_size * len(self.test_dataset)
             hit_ratio = (correct / total) * 100
