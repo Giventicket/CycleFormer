@@ -264,7 +264,7 @@ class TSPModel(pl.LightningModule):
         node_size = tsp_tours.shape[1]
         src_original = src.clone()
 
-        G = 20
+        G = 100
 
         src = src.unsqueeze(1).repeat(1, G, 1, 1).reshape(batch_size * G, node_size, 2) # [B * G, N, 2]
         tgt = torch.arange(G).to(src.device).unsqueeze(0).repeat(batch_size, 1).reshape(batch_size * G, 1) # [B * G, 1]

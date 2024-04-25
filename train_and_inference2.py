@@ -81,10 +81,10 @@ class TSPModel(pl.LightningModule):
         train_dataloader = DataLoader(
             train_dataset, 
             batch_size = self.cfg.train_batch_size, 
-            # shuffle = True, 
             shuffle = False, 
             collate_fn = collate_fn,
-            pin_memory=True
+            pin_memory=True,
+            num_workers = 80
         )
         return train_dataloader
 
@@ -95,7 +95,8 @@ class TSPModel(pl.LightningModule):
             batch_size = self.cfg.val_batch_size, 
             shuffle = False, 
             collate_fn = collate_fn_val,
-            pin_memory=True
+            pin_memory=True,
+            num_workers = 80
         )
         return val_dataloader
     
@@ -113,7 +114,14 @@ class TSPModel(pl.LightningModule):
         self.model.train()
         out = self.model(src, tgt, tgt_mask) # [B, V, E]
         
-        loss = self.loss_compute(out, tgt_y, visited_mask, ntokens, self.model.comparison_matrix) # check! 
+        losses = []
+        for intermediate in self.model.decoder.intermediates:
+            loss = self.loss_compute(intermediate, tgt_y, visited_mask, ntokens, self.model.comparison_matrix)
+            losses.append(loss)
+        loss = sum(losses) / len(losses)
+        
+        
+        # loss = self.loss_compute(out, tgt_y, visited_mask, ntokens, self.model.comparison_matrix) # check! 
         
         training_step_outputs = [l.item() for l in loss]
         self.train_outputs.extend(training_step_outputs)
@@ -163,7 +171,6 @@ class TSPModel(pl.LightningModule):
         tsp_tours = batch["tsp_tours"]
         
         batch_size = tsp_tours.shape[0]
-        self.model.eval()
         with torch.no_grad():
             memory = self.model.encode(src)
             ys = tgt.clone()
@@ -246,7 +253,8 @@ class TSPModel(pl.LightningModule):
             batch_size = self.cfg.val_batch_size, 
             shuffle = False, 
             collate_fn = collate_fn_val,
-            pin_memory=True
+            pin_memory=True,
+            num_workers = 80
         )
         return test_dataloader
 
@@ -261,7 +269,6 @@ class TSPModel(pl.LightningModule):
         
         batch_size = tsp_tours.shape[0]
         
-        self.model.eval()
         with torch.no_grad():
             memory = self.model.encode(src)
             ys = tgt.clone()
@@ -339,6 +346,41 @@ def parse_arguments():
     args = parser.parse_args()
     return args
 
+from discord_webhook import DiscordWebhook, DiscordEmbed
+
+def start_discord(cfg, v_num):
+    url = "https://discord.com/api/webhooks/1231575588091854939/UlCuJCo_R_0s0spOo4UPyO49GyBoT4uPuJ-YYFsr3UKmnDeK8oq_ZwknBxR4qwCcAA4V"
+    webhook = DiscordWebhook(url=url)
+
+    embed = DiscordEmbed(title="Train start", description=f"version_{v_num}", color="03b2f8")
+    embed.set_author(name="Junpyo, Seo")
+    embed.set_timestamp()
+
+    for k, v in cfg.items():
+        # embed.add_embed_field(name=str(k), value=str(v), inline=False)
+        print(k, v)
+        embed.add_embed_field(name=str(k), value=str(v))
+
+    webhook.add_embed(embed)
+    response = webhook.execute()
+
+def end_discord(v_num, metrics=None, best_hit_ratio=None, elapsed_time=None):
+    url = "https://discord.com/api/webhooks/1231575588091854939/UlCuJCo_R_0s0spOo4UPyO49GyBoT4uPuJ-YYFsr3UKmnDeK8oq_ZwknBxR4qwCcAA4V"
+    webhook = DiscordWebhook(url=url)
+
+    embed = DiscordEmbed(title="Train End", description=f"version_{v_num}", color="03b2f8")
+    embed.set_author(name="Junpyo, Seo")
+    embed.set_timestamp()
+    
+    for idx, (optgap, filename) in enumerate(metrics):
+        embed.add_embed_field(name=f"top{idx + 1} opt gap (%)", value=filename, inline = False)
+    
+    embed.add_embed_field(name="top1 hit ratio (%)", value=str(best_hit_ratio), inline = False)
+    embed.add_embed_field(name="total train time (s)", value=str(elapsed_time), inline = False)
+
+    webhook.add_embed(embed)
+    response = webhook.execute()
+
 if __name__ == "__main__":
     args = parse_arguments()
     cfg = OmegaConf.load(args.config)
@@ -370,5 +412,32 @@ if __name__ == "__main__":
         callbacks=[checkpoint_callback],
         strategy="ddp_find_unused_parameters_true",
     )
-    trainer.fit(tsp_model)
     
+    if trainer.is_global_zero:
+        items = trainer.progress_bar_callback.get_metrics(trainer, tsp_model)
+        v_num = items.pop("v_num", None)
+        start_discord(cfg, v_num)
+
+    # training and save ckpt
+    s = time.time()
+    trainer.fit(tsp_model)
+    e = time.time()
+    elapsed_time = e - s
+    
+    best_model_dir = os.path.join(trainer.default_root_dir, checkpoint_callback.best_model_path)
+    tsp_model = TSPModel.load_from_checkpoint(best_model_dir)
+    trainer.test(tsp_model)
+    
+    if trainer.is_global_zero:
+        model_dir = os.path.join(trainer.default_root_dir, checkpoint_callback.dirpath)
+        
+        metrics = []
+        trainer_files = glob.glob(os.path.join(model_dir, "*"))
+        for file in trainer_files:
+            metrics.append([float(str(file).split("=")[-1].split(".ckpt")[0]), file])
+        metrics.sort()
+        
+        best_hit_ratio = tsp_model.hit_ratio
+        end_discord(v_num, metrics, best_hit_ratio, elapsed_time)
+        
+        

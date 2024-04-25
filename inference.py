@@ -115,7 +115,6 @@ class TSPModel(pl.LightningModule):
         
         loss = self.loss_compute(out, tgt_y, visited_mask, ntokens, self.model.comparison_matrix) # check! 
         
-
         training_step_outputs = [l.item() for l in loss]
         self.train_outputs.extend(training_step_outputs)
 

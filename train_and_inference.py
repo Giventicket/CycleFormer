@@ -50,7 +50,6 @@ class TSPModel(pl.LightningModule):
             use_decoderCPE = cfg.use_decoderCPE,
         )
         self.automatic_optimization = False
-        
         criterion = LabelSmoothing(size=cfg.node_size, smoothing=cfg.smoothing)
         
         self.loss_compute = SimpleLossCompute(self.model.generator, criterion, cfg.node_size)
@@ -82,9 +81,10 @@ class TSPModel(pl.LightningModule):
         train_dataloader = DataLoader(
             train_dataset, 
             batch_size = self.cfg.train_batch_size, 
-            shuffle = True, 
+            shuffle = False, 
             collate_fn = collate_fn,
-            pin_memory=True
+            pin_memory=True,
+            num_workers = 80
         )
         return train_dataloader
 
@@ -95,7 +95,8 @@ class TSPModel(pl.LightningModule):
             batch_size = self.cfg.val_batch_size, 
             shuffle = False, 
             collate_fn = collate_fn_val,
-            pin_memory=True
+            pin_memory=True,
+            num_workers = 80
         )
         return val_dataloader
     
@@ -113,13 +114,15 @@ class TSPModel(pl.LightningModule):
         self.model.train()
         out = self.model(src, tgt, tgt_mask) # [B, V, E]
         
+        """
         losses = []
         for intermediate in self.model.decoder.intermediates:
             loss = self.loss_compute(intermediate, tgt_y, visited_mask, ntokens, self.model.comparison_matrix)
             losses.append(loss)
         loss = sum(losses) / len(losses)
+        """
         
-        # loss = self.loss_compute(out, tgt_y, visited_mask, ntokens, self.model.comparison_matrix) # check! 
+        loss = self.loss_compute(out, tgt_y, visited_mask, ntokens, self.model.comparison_matrix) # check! 
         
         training_step_outputs = [l.item() for l in loss]
         self.train_outputs.extend(training_step_outputs)
@@ -169,7 +172,6 @@ class TSPModel(pl.LightningModule):
         tsp_tours = batch["tsp_tours"]
         
         batch_size = tsp_tours.shape[0]
-        self.model.eval()
         with torch.no_grad():
             memory = self.model.encode(src)
             ys = tgt.clone()
@@ -252,7 +254,8 @@ class TSPModel(pl.LightningModule):
             batch_size = self.cfg.val_batch_size, 
             shuffle = False, 
             collate_fn = collate_fn_val,
-            pin_memory=True
+            pin_memory=True,
+            num_workers = 80
         )
         return test_dataloader
 
@@ -267,7 +270,6 @@ class TSPModel(pl.LightningModule):
         
         batch_size = tsp_tours.shape[0]
         
-        self.model.eval()
         with torch.no_grad():
             memory = self.model.encode(src)
             ys = tgt.clone()
