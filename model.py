@@ -137,8 +137,10 @@ class Decoder(nn.Module):
         self.norm = nn.LayerNorm(layer.size)
 
     def forward(self, x, memory, tgt_mask):
-        for layer in self.layers:
+        # self.intermediates = []
+        for idx, layer in enumerate(self.layers):
             x = layer(x, memory, tgt_mask)
+            # self.intermediates.append(self.norm(x))
         return self.norm(x)
 
 class DecoderLayer(nn.Module):

@@ -138,14 +138,15 @@ class TSPModel(pl.LightningModule):
             self.train_start_time = time.time()
     
     def on_train_epoch_end(self):
-        outputs = self.all_gather(self.train_outputs)
+        outputs = self.all_gather(sum(self.train_outputs))
+        lengths = self.all_gather(len(self.train_outputs))
         self.train_outputs.clear()
         
         lr_scheduler = self.lr_schedulers() # manual backprop
         lr_scheduler.step() # manual backprop
         
         if self.trainer.is_global_zero:
-            train_loss = torch.stack(outputs).mean()
+            train_loss = outputs.sum() / lengths.sum()
             train_time = time.time() - self.train_start_time
             self.print(
                 f"##############Train: Epoch {self.current_epoch}###################",
@@ -257,7 +258,6 @@ class TSPModel(pl.LightningModule):
         ntokens = batch["ntokens"]
         tgt_mask = batch["tgt_mask"]
         tsp_tours = batch["tsp_tours"]
-        reversed_tsp_tours = batch["reversed_tsp_tours"]
         
         batch_size = tsp_tours.shape[0]
         
@@ -310,7 +310,7 @@ class TSPModel(pl.LightningModule):
         return result
     
     def on_test_epoch_end(self):
-        corrects = self.all_gather(self.test_corrects)
+        corrects = self.all_gather(sum(self.test_corrects))
         optimal_tour_distances = self.all_gather(sum(self.test_optimal_tour_distances))
         predicted_tour_distances = self.all_gather(sum(self.test_predicted_tour_distances))
         
@@ -319,7 +319,6 @@ class TSPModel(pl.LightningModule):
         self.test_predicted_tour_distances.clear()
         
         if self.trainer.is_global_zero:
-            corrects = torch.stack(corrects)
             correct = corrects.sum().item()
             total = self.cfg.node_size * len(self.test_dataset)
             hit_ratio = (correct / total) * 100
@@ -339,41 +338,6 @@ def parse_arguments():
     parser.add_argument("--config", default="./config.yaml", help="Path to the configuration YAML file.")
     args = parser.parse_args()
     return args
-
-from discord_webhook import DiscordWebhook, DiscordEmbed
-
-def start_discord(cfg, v_num):
-    url = "https://discord.com/api/webhooks/1230053530966949970/PUiYwiueb0ozpaAldev9noi_LIqFX36M8mIa9UlYolt2Wx4g_NulM4C46ky1TOjxtsY1"
-    webhook = DiscordWebhook(url=url)
-
-    embed = DiscordEmbed(title="Train start", description=f"version_{v_num}", color="03b2f8")
-    embed.set_author(name="Junpyo, Seo")
-    embed.set_timestamp()
-
-    for k, v in cfg.items():
-        # embed.add_embed_field(name=str(k), value=str(v), inline=False)
-        print(k, v)
-        embed.add_embed_field(name=str(k), value=str(v))
-
-    webhook.add_embed(embed)
-    response = webhook.execute()
-
-def end_discord(v_num, metrics=None, best_hit_ratio=None, elapsed_time=None):
-    url = "https://discord.com/api/webhooks/1230053530966949970/PUiYwiueb0ozpaAldev9noi_LIqFX36M8mIa9UlYolt2Wx4g_NulM4C46ky1TOjxtsY1"
-    webhook = DiscordWebhook(url=url)
-
-    embed = DiscordEmbed(title="Train End", description=f"version_{v_num}", color="03b2f8")
-    embed.set_author(name="Junpyo, Seo")
-    embed.set_timestamp()
-    
-    for idx, (optgap, filename) in enumerate(metrics):
-        embed.add_embed_field(name=f"top{idx + 1} opt gap (%)", value=filename, inline = False)
-    
-    embed.add_embed_field(name="top1 hit ratio", value=str(best_hit_ratio), inline = False)
-    embed.add_embed_field(name="total train time", value=str(elapsed_time), inline = False)
-
-    webhook.add_embed(embed)
-    response = webhook.execute()
 
 if __name__ == "__main__":
     args = parse_arguments()
