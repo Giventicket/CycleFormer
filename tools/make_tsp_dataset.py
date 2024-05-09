@@ -10,6 +10,17 @@ import tqdm
 import os
 import glob
 
+import lkh
+"""
+wget http://akira.ruc.dk/~keld/research/LKH-3/LKH-3.0.6.tgz
+tar xvfz LKH-3.0.6.tgz
+cd LKH-3.0.6
+make
+sudo cp LKH /usr/local/bin
+"""
+
+import tsplib95 # pip install tsplib95
+
 from concorde.tsp import TSPSolver  # https://github.com/jvkersch/pyconcorde
 
 # pip install 'pyconcorde @ git+https://github.com/jvkersch/pyconcorde'
@@ -18,13 +29,15 @@ warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--min_nodes", type=int, default=100)
-    parser.add_argument("--max_nodes", type=int, default=100)
-    parser.add_argument("--num_samples", type=int, default=1280000)
-    parser.add_argument("--batch_size", type=int, default=100)
+    parser.add_argument("--min_nodes", type=int, default=500)
+    parser.add_argument("--max_nodes", type=int, default=500)
+    parser.add_argument("--num_samples", type=int, default=128)
+    parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--filename", type=str, default=None)
     parser.add_argument("--solver", type=str, default="concorde")
-    parser.add_argument("--seed", type=int, default=1234)
+    parser.add_argument("--lkh_trails", type=int, default=1000)
+    parser.add_argument("--seed", type=int, default=4321) # test seed
+    # parser.add_argument("--seed", type=int, default=1234) # train seed
     opts = parser.parse_args()
 
     assert opts.num_samples % opts.batch_size == 0, "Number of samples must be divisible by batch size"
@@ -32,7 +45,8 @@ if __name__ == "__main__":
     np.random.seed(opts.seed)
 
     if opts.filename is None:
-        opts.filename = f"tsp{opts.min_nodes}-{opts.max_nodes}_concorde.txt"
+        # opts.filename = f"tsp{opts.min_nodes}-{opts.max_nodes}_concorde.txt"
+        opts.filename = "tsp500_test_concorde.txt"
 
     # Pretty print the run args
     pp.pprint(vars(opts))
@@ -51,6 +65,20 @@ if __name__ == "__main__":
                     solver = TSPSolver.from_data(nodes_coord[:, 0] * scale, nodes_coord[:, 1] * scale, norm="EUC_2D")
                     solution = solver.solve(verbose=False)
                     tour = solution.tour
+                elif opts.solver == "lkh":
+                    scale = 1e6
+                    # lkh_path = 'LKH-3.0.9/LKH'
+                    lkh_path = 'LKH'
+                    problem = tsplib95.models.StandardProblem()
+                    problem.name = 'TSP'
+                    problem.type = 'TSP'
+                    problem.dimension = num_nodes
+                    problem.edge_weight_type = 'EUC_2D'
+                    problem.node_coords = {n + 1: nodes_coord[n] * scale for n in range(num_nodes)}
+
+                    # solution = lkh.solve(lkh_path, problem=problem, max_trials=opts.lkh_trails, runs=10)
+                    solution = lkh.solve(problem=problem, max_trials=opts.lkh_trails, runs=10)
+                    tour = [n - 1 for n in solution[0]]
                 else:
                     raise ValueError(f"Unknown solver: {opts.solver}")
 
@@ -74,7 +102,3 @@ if __name__ == "__main__":
     print(f"Completed generation of {opts.num_samples} samples of TSP{opts.min_nodes}-{opts.max_nodes}.")
     print(f"Total time: {end_time / 60:.1f}m")
     print(f"Average time: {end_time / opts.num_samples:.1f}s")
-
-    res_files = glob.glob(os.path.join("./", "*.res"))
-    for res_file in res_files:
-        os.remove(res_file)

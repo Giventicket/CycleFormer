@@ -22,7 +22,6 @@ from dataset_inference import collate_fn as collate_fn_val
 from model import make_model, subsequent_mask
 from loss import SimpleLossCompute, LabelSmoothing
 
-
 def rate(step, model_size, factor, warmup):
     """
     we have to default the step to 1 for LambdaLR function
@@ -38,18 +37,18 @@ class TSPModel(pl.LightningModule):
         super().__init__()
         self.model = make_model(
             src_sz=cfg.node_size, 
-            tgt_sz=cfg.decoder_output_size, 
             enc_num_layers = cfg.enc_num_layers,
             dec_num_layers = cfg.dec_num_layers,
             d_model=cfg.d_model, 
             d_ff=cfg.d_ff, 
             h=cfg.h, 
             dropout=cfg.dropout,
-            mode=cfg.mode,
-            share_lut=cfg.share_lut,
-            use_decoderCPE = cfg.use_decoderCPE,
+            encoder_pe = "2D",
+            decoder_pe = "circular",
+            decoder_lut = "memory",
         )
         self.automatic_optimization = False
+        
         criterion = LabelSmoothing(size=cfg.node_size, smoothing=cfg.smoothing)
         
         self.loss_compute = SimpleLossCompute(self.model.generator, criterion, cfg.node_size)
@@ -69,7 +68,7 @@ class TSPModel(pl.LightningModule):
         self.save_hyperparameters(cfg)  # save config file with pytorch lightening
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.cfg.lr, betas=self.cfg.betas, eps=self.cfg.eps)
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.cfg.lr*len(self.cfg.gpus), betas=self.cfg.betas, eps=self.cfg.eps)
         lr_scheduler = LambdaLR(
             optimizer=optimizer,
             lr_lambda=lambda step: rate(step, model_size=self.cfg.d_model, factor=self.cfg.factor, warmup=self.cfg.warmup),
@@ -81,8 +80,7 @@ class TSPModel(pl.LightningModule):
         train_dataloader = DataLoader(
             train_dataset, 
             batch_size = self.cfg.train_batch_size, 
-            # shuffle = True, 
-            shuffle = False, 
+            shuffle = True, 
             collate_fn = collate_fn,
             pin_memory=True
         )
@@ -113,8 +111,18 @@ class TSPModel(pl.LightningModule):
         self.model.train()
         out = self.model(src, tgt, tgt_mask) # [B, V, E]
         
-        loss = self.loss_compute(out, tgt_y, visited_mask, ntokens, self.model.comparison_matrix) # check! 
+        if self.cfg.comparison_matrix == "memory":
+            comparison_matrix = self.model.memory
+        elif self.cfg.comparison_matrix == "encoder_lut":
+            comparison_matrix = self.model.encoder_lut
+        elif self.cfg.comparison_matrix == "decoder_lut":
+            comparison_matrix = self.model.decoder_lut
+        else:
+            assert False
         
+        loss = self.loss_compute(out, tgt_y, visited_mask, ntokens, comparison_matrix) # check! 
+        
+
         training_step_outputs = [l.item() for l in loss]
         self.train_outputs.extend(training_step_outputs)
 
@@ -172,7 +180,17 @@ class TSPModel(pl.LightningModule):
                 # memory, tgt, tgt_mask
                 tgt_mask = subsequent_mask(ys.size(1)).type(torch.bool).to(src.device)
                 out = self.model.decode(memory, src, ys, tgt_mask)
-                prob = self.model.generator(out[:, -1].unsqueeze(1), visited_mask, self.model.comparison_matrix)
+                
+                if self.cfg.comparison_matrix == "memory":
+                    comparison_matrix = self.model.memory
+                elif self.cfg.comparison_matrix == "encoder_lut":
+                    comparison_matrix = self.model.encoder_lut
+                elif self.cfg.comparison_matrix == "decoder_lut":
+                    comparison_matrix = self.model.decoder_lut
+                else:
+                    assert False
+                    
+                prob = self.model.generator(out[:, -1].unsqueeze(1), visited_mask, comparison_matrix)
                 
                 _, next_word = torch.max(prob, dim=-1)
                 next_word = next_word.squeeze(-1)
@@ -243,7 +261,7 @@ class TSPModel(pl.LightningModule):
         self.test_dataset = TSPDataset_Val(self.cfg.val_data_path)
         test_dataloader = DataLoader(
             self.test_dataset, 
-            batch_size = self.cfg.val_batch_size, 
+            batch_size = self.cfg.test_batch_size, 
             shuffle = False, 
             collate_fn = collate_fn_val,
             pin_memory=True
@@ -257,9 +275,20 @@ class TSPModel(pl.LightningModule):
         ntokens = batch["ntokens"]
         tgt_mask = batch["tgt_mask"]
         tsp_tours = batch["tsp_tours"]
-        reversed_tsp_tours = batch["reversed_tsp_tours"]
         
         batch_size = tsp_tours.shape[0]
+        node_size = tsp_tours.shape[1]
+        src_original = src.clone()
+
+        G = self.cfg.G
+        self.G = G
+
+        src = src.unsqueeze(1).repeat(1, G, 1, 1).reshape(batch_size * G, node_size, 2) # [B * G, N, 2]
+        tgt = torch.arange(G).to(src.device).unsqueeze(0).repeat(batch_size, 1).reshape(batch_size * G, 1) # [B * G, 1]
+        
+        visited_mask = torch.zeros(batch_size, G, 1, node_size, dtype = torch.bool, device = src.device) # [B, G, 1, N]
+        visited_mask[:, torch.arange(G), :, torch.arange(G)] = True
+        visited_mask = visited_mask.reshape(batch_size * G, 1, node_size)
         
         self.model.eval()
         with torch.no_grad():
@@ -270,15 +299,31 @@ class TSPModel(pl.LightningModule):
                 # memory, tgt, tgt_mask
                 tgt_mask = subsequent_mask(ys.size(1)).type(torch.bool).to(src.device)
                 out = self.model.decode(memory, src, ys, tgt_mask)
-                prob = self.model.generator(out[:, -1].unsqueeze(1), visited_mask, self.model.comparison_matrix)
+                
+                if self.cfg.comparison_matrix == "memory":
+                    comparison_matrix = self.model.memory
+                elif self.cfg.comparison_matrix == "encoder_lut":
+                    comparison_matrix = self.model.encoder_lut
+                elif self.cfg.comparison_matrix == "decoder_lut":
+                    comparison_matrix = self.model.decoder_lut
+                else:
+                    assert False
+                
+                prob = self.model.generator(out[:, -1].unsqueeze(1), visited_mask, comparison_matrix)
                 
                 _, next_word = torch.max(prob, dim=-1)
                 next_word = next_word.squeeze(-1)
                 
-                visited_mask[torch.arange(batch_size), 0, next_word] = True
+                visited_mask[torch.arange(batch_size * G), 0, next_word] = True
                 
-                ys = torch.cat([ys, next_word.unsqueeze(-1)], dim=1)
+                ys = torch.cat([ys, next_word.unsqueeze(-1)], dim=1) # [B * G, N]
         
+        predicted_tour_distances = self.get_tour_distance(src, ys) # [B * G, 1]
+        predicted_tour_distances = predicted_tour_distances.reshape(batch_size, G)
+        indices = torch.argmin(predicted_tour_distances, dim = -1) # [B]
+        
+        ys = ys.reshape(batch_size, G, node_size)
+        ys = ys[torch.arange(batch_size), indices, :]
         
         from collections import Counter
         correct = []
@@ -294,8 +339,8 @@ class TSPModel(pl.LightningModule):
             correct.append(sum(common_edges.values()))
         
         correct = torch.tensor(correct)
-        optimal_tour_distance = self.get_tour_distance(src, tsp_tours)
-        predicted_tour_distance = self.get_tour_distance(src, ys)
+        optimal_tour_distance = self.get_tour_distance(src_original, tsp_tours)
+        predicted_tour_distance = self.get_tour_distance(src_original, ys)
         
         result = {
             "correct": correct.tolist(),
@@ -307,16 +352,34 @@ class TSPModel(pl.LightningModule):
         self.test_optimal_tour_distances.extend(result["optimal_tour_distance"])
         self.test_predicted_tour_distances.extend(result["predicted_tour_distance"])
         
+        opt_gaps = (predicted_tour_distance - optimal_tour_distance) / optimal_tour_distance * 100
+        
+        """
+        if self.trainer.is_global_zero:
+            for idx in range(batch_size):
+                print()
+                print("predicted tour: ", ys[idx].tolist())
+                print("optimal tour: ", tsp_tours[idx].tolist())
+                print("opt, pred tour distance: ", optimal_tour_distance[idx].item(), predicted_tour_distance[idx].item())
+                print("optimality gap: ", ((predicted_tour_distance[idx].item() - optimal_tour_distance[idx].item()) / optimal_tour_distance[idx].item()) * 100, "%")
+                print("node prediction [hit ratio]: ", (correct[idx].item() / self.cfg.node_size) * 100 , "%")
+                print()
+        """
+        
         return result
     
     def on_test_epoch_end(self):
-        corrects = self.all_gather(sum(self.test_corrects))
-        optimal_tour_distances = self.all_gather(sum(self.test_optimal_tour_distances))
-        predicted_tour_distances = self.all_gather(sum(self.test_predicted_tour_distances))
+        local_corrects = sum(self.test_corrects)
+        local_optimal = sum(self.test_optimal_tour_distances)
+        local_predicted = sum(self.test_predicted_tour_distances)
         
         self.test_corrects.clear()
         self.test_optimal_tour_distances.clear()
         self.test_predicted_tour_distances.clear()
+        
+        corrects = self.all_gather(local_corrects)
+        optimal_tour_distances = self.all_gather(local_optimal)
+        predicted_tour_distances = self.all_gather(local_predicted)
         
         if self.trainer.is_global_zero:
             correct = corrects.sum().item()
