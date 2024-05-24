@@ -1,17 +1,17 @@
-train_data_path: ./tsp500_train_concorde.txt
-val_data_path: ./tsp1000_test_concorde.txt
-node_size: 1000
+train_data_path: ./tsp50_train_concorde.txt
+val_data_path: ./tsp50_test_concorde.txt
+node_size: 50
 train_batch_size: 80 # [tsp50, tsp100, tsp500, tsp1000]: 80
 val_batch_size: 128 # [tsp50, tsp100]: 1280, [tsp500, tsp1000]: 128
 test_batch_size: 1
-G: 1000
-resume_checkpoint: ./TSP1000-epoch=13-opt_gap=36.1348.ckpt
+G: 1
+resume_checkpoint: None
 gpus: [0]
 max_epochs: 100
-enc_num_layers: 12
-dec_num_layers: 12
-d_model: 256
-d_ff: 1024
+enc_num_layers: 6
+dec_num_layers: 6
+d_model: 128
+d_ff: 512
 h: 8
 dropout: 0.1
 smoothing: 0.1
