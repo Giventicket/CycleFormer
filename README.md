@@ -23,6 +23,12 @@ Results on large-scale Random TSP.
 ### Pretrained Checkpoints
 *(To be uploaded)*
 
+### Build and Run Docker Container
+```bash
+docker build -t cycleformer-image .
+docker run -it --gpus all --ipc host cycleformer-image
+```
+
 ### Train Command
 ```bash
 python3 train.py \
@@ -76,10 +82,4 @@ python inference.py \
     --G {node_size} \ 
     --checkpoint_path ./Cycleformer_{node_size}.pth \
     --gpus 0
-```
-
-### Build and Run Docker Container
-```bash
-docker build -t cycleformer-image .
-docker run -it --gpus all --ipc host cycleformer-image
 ```
