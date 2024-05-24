@@ -1,4 +1,4 @@
-# CycleFormer: TSP Solver Based on Transformer Models
+# CycleFormer: TSP Solver Based on Language Modeling
 
 We introduce CycleFormer, a novel transformer model tailored specifically for the Traveling Salesman Problem (TSP). Unlike conventional transformer models designed for natural language processing, TSP presents unique challenges due to its dynamic and unlimited node set. To address this, we have innovatively integrated key elements into CycleFormer to harness the full potential of transformers for TSP.
 
