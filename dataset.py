@@ -55,8 +55,7 @@ class TSPDataset(Dataset):
         with open(self.data_path, "r") as fp:
             tsp_set = fp.readlines()
             for idx, tsp in enumerate(tsp_set):
-                if idx == 320:
-                    break
+                
                 tsp = tsp.split("output")
                 tsp_instance = tsp[0].split()
 

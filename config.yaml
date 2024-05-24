@@ -1,17 +1,17 @@
-train_data_path: ./tsp100_train_concorde.txt
-val_data_path: ./tsp100_test_concorde.txt
-node_size: 100
-train_batch_size: 80 # [tsp50, tsp100, tsp500, tsp1000]: 80, [tsp10000]: 8
-val_batch_size: 1280 # [tsp50, tsp100, tsp500, tsp1000]: 1280, [tsp10000]: 16
-test_batch_size: 1280
-G: 1
-resume_checkpoint: None
-gpus: [0, 1, 2, 3]
-max_epochs: 1
-enc_num_layers: 24
-dec_num_layers: 24
-d_model: 512
-d_ff: 2048
+train_data_path: ./tsp500_train_concorde.txt
+val_data_path: ./tsp1000_test_concorde.txt
+node_size: 1000
+train_batch_size: 80 # [tsp50, tsp100, tsp500, tsp1000]: 80
+val_batch_size: 128 # [tsp50, tsp100]: 1280, [tsp500, tsp1000]: 128
+test_batch_size: 1
+G: 1000
+resume_checkpoint: ./TSP1000-epoch=13-opt_gap=36.1348.ckpt
+gpus: [0]
+max_epochs: 100
+enc_num_layers: 12
+dec_num_layers: 12
+d_model: 256
+d_ff: 1024
 h: 8
 dropout: 0.1
 smoothing: 0.1
@@ -22,6 +22,6 @@ eps: 1e-9
 factor: 1.0
 warmup: 400
 encoder_pe: 2D # None, 2D
-decoder_pe: circular # None, 1D, circular 
+decoder_pe: circular PE # None, 1D, circular 
 decoder_lut: memory # shared, unshared, memory
 comparison_matrix: memory # encoder_lut, decoder_lut, memory

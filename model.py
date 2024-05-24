@@ -69,7 +69,8 @@ class EncoderDecoder(nn.Module):
         
         self.decoder_lut = tgt_embeddings
         
-        tgt_embeddings = self.decoder_pe(tgt_embeddings)
+        if self.decoder_pe is not None:
+            tgt_embeddings = self.decoder_pe(tgt_embeddings)
         
         return self.decoder(tgt_embeddings, memory, tgt_mask)
     
@@ -331,6 +332,53 @@ class PositionalEncoding_1D(nn.Module):
         x = x + self.pe[:, : x.size(1)].requires_grad_(False)
         return self.dropout(x)
 
+class PositionalEncoding_Cyclic(nn.Module):
+
+    def __init__(self, d_model, dropout, seq_len):
+        super(PositionalEncoding_Cyclic, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+        pe = self.Cyclic_Positional_Encoding(seq_len, d_model)
+        pe = pe.unsqueeze(0)
+        self.register_buffer("pe", pe)
+        
+    def basesin(self, x, T, fai = 0):
+        return np.sin(2 * np.pi / T * np.abs(np.mod(x, 2 * T) - T) + fai)
+    
+    def basecos(self, x, T, fai = 0):
+        return np.cos(2 * np.pi / T * np.abs(np.mod(x, 2 * T) - T) + fai)
+
+    def Cyclic_Positional_Encoding(self, seq_len, emb_dim, mean_pooling = True):
+        Td_set = np.linspace(np.power(seq_len, 1 / (emb_dim // 2)), seq_len, emb_dim // 2, dtype = 'int')
+        x = np.zeros((seq_len, emb_dim))
+            
+        for i in range(emb_dim):
+            Td = Td_set[i // 3 * 3 + 1] if  (i // 3 * 3 + 1) < (emb_dim // 2) else Td_set[-1]
+            fai = 0 if i <= (emb_dim // 2) else  2 * np.pi * ((-i + (emb_dim // 2)) / (emb_dim // 2))
+            longer_pattern = np.arange(0, np.ceil((seq_len) / Td) * Td, 0.01)
+            if i % 2 ==1:
+                x[:,i] = self.basecos(longer_pattern, Td, fai)[np.linspace(0, len(longer_pattern), seq_len, dtype = 'int', endpoint = False)]
+            else:
+                x[:,i] = self.basesin(longer_pattern, Td, fai)[np.linspace(0, len(longer_pattern), seq_len, dtype = 'int', endpoint = False)]
+                
+        pattern = torch.from_numpy(x).type(torch.FloatTensor)
+        pattern_sum = torch.zeros_like(pattern)
+        
+        arange = torch.arange(seq_len)
+        pooling = [0] if not mean_pooling else [-2, -1, 0, 1, 2]
+        time = 0
+        for i in pooling:
+            time += 1
+            index = (arange + i + seq_len) % seq_len
+            pattern_sum += pattern.gather(0, index.view(-1,1).expand_as(pattern))
+        pattern = 1. / time * pattern_sum - pattern.mean(0)
+        
+        return pattern
+
+    def forward(self, x):
+        x = x + self.pe[:, : x.size(1)].requires_grad_(False)
+        return self.dropout(x)
+
+
 def make_model(
     src_sz, 
     enc_num_layers=6, 
@@ -358,8 +406,10 @@ def make_model(
         decoder_pe = PositionalEncoding_Circular(d_model, dropout, src_sz)
     elif decoder_pe == "1D":
         decoder_pe = PositionalEncoding_1D(d_model, dropout)
+    elif decoder_pe == "CPE":
+        decoder_pe = PositionalEncoding_Cyclic(d_model, dropout)
     else:
-        assert False
+        decoder_pe = None
     
     if decoder_lut == "shared":
         tgt_embed = src_embed

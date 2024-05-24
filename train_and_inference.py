@@ -43,9 +43,9 @@ class TSPModel(pl.LightningModule):
             d_ff=cfg.d_ff, 
             h=cfg.h, 
             dropout=cfg.dropout,
-            encoder_pe = "2D",
-            decoder_pe = "circular",
-            decoder_lut = "memory",
+            encoder_pe = cfg.encoder_pe,
+            decoder_pe = cfg.decoder_pe,
+            decoder_lut = cfg.decoder_lut,
         )
         self.automatic_optimization = False
         
@@ -406,7 +406,7 @@ def parse_arguments():
 from discord_webhook import DiscordWebhook, DiscordEmbed
 
 def start_discord(cfg, v_num):
-    url = "https://discord.com/api/webhooks/1231575588091854939/UlCuJCo_R_0s0spOo4UPyO49GyBoT4uPuJ-YYFsr3UKmnDeK8oq_ZwknBxR4qwCcAA4V"
+    url = "https://discord.com/api/webhooks/1241681417096790137/jmnkoCveb2r6YNwj6fIEuu6SXOH9FDEFqgSEHACGOHReZTmO1xZeQ8YECPgSxBjFklMg"
     webhook = DiscordWebhook(url=url)
 
     embed = DiscordEmbed(title="Train start", description=f"version_{v_num}", color="03b2f8")
@@ -423,7 +423,7 @@ def start_discord(cfg, v_num):
     response = webhook.execute()
 
 def end_discord(v_num, metrics=None, G = None, G_hitratio = None, G_optgap = None, elapsed_time=None):
-    url = "https://discord.com/api/webhooks/1231575588091854939/UlCuJCo_R_0s0spOo4UPyO49GyBoT4uPuJ-YYFsr3UKmnDeK8oq_ZwknBxR4qwCcAA4V"
+    url = "https://discord.com/api/webhooks/1241681417096790137/jmnkoCveb2r6YNwj6fIEuu6SXOH9FDEFqgSEHACGOHReZTmO1xZeQ8YECPgSxBjFklMg"
     webhook = DiscordWebhook(url=url)
 
     embed = DiscordEmbed(title="Train End", description=f"version_{v_num}", color="03b2f8")
