@@ -1,3 +1,6 @@
+# Reference to the Annotated Transformer implementation by Harvard NLP
+# Source: https://github.com/harvardnlp/annotated-transformer/blob/master/AnnotatedTransformer.ipynb
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -5,10 +8,8 @@ import numpy as np
 import math
 import copy
 
-from flash_attn.bert_padding import pad_input, unpad_input
 from flash_attn.flash_attn_interface import (
     flash_attn_func,
-    flash_attn_varlen_kvpacked_func,
 )
 
 class EncoderDecoder(nn.Module):
@@ -197,8 +198,11 @@ class FlashMultiHeadedAttention(nn.Module):
         ]
 
         # 2) Apply attention on all the projected vectors in batch.
-        # reference1: https://github.com/lm-sys/FastChat/blob/main/fastchat/train/llama_flash_attn_monkey_patch.py
-        # reference2: https://github.com/lm-sys/FastChat/blob/main/fastchat/train/llama2_flash_attn_monkey_patch.py
+        # Source: https://github.com/Dao-AILab/flash-attention
+        
+        # git clone https://github.com/Dao-AILab/flash-attention.git
+        # cd flash-attention
+        # python setup.py install
         
         attention_mask = mask
         if attention_mask is None:

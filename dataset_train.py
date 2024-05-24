@@ -1,9 +1,7 @@
 import torch
 from torch.utils.data import DataLoader, Dataset
 from model import subsequent_mask
-
 from tqdm import tqdm
-from pprint import pprint
 
 class TSPDataset(Dataset):
     def __init__(
@@ -43,7 +41,7 @@ class TSPDataset(Dataset):
         with open(self.data_path, "r") as fp:
             tsp_set = fp.readlines()
             for idx, tsp in enumerate(tsp_set):
-                    
+                
                 tsp = tsp.split("output")
                 tsp_instance = tsp[0].split()
 
@@ -62,23 +60,31 @@ class TSPDataset(Dataset):
 
     def _process(self):
         for tsp_instance, tsp_tour in tqdm(zip(self.tsp_instances, self.tsp_tours)):
-            ntoken = 1
+            ntoken = len(tsp_tour) - 1
             self.ntokens.append(torch.LongTensor([ntoken]))
             self.src.append(tsp_instance)
             self.tgt.append(tsp_tour[0:ntoken])
+            self.tgt_y.append(tsp_tour[1:ntoken+1])
             
+            """            
             visited_mask = torch.zeros(ntoken, self.max_node_size, dtype=torch.bool)
             for v in range(ntoken):
                 visited_mask[v: , self.tgt[-1][v]] = True # visited
-                
-            self.visited_mask.append(visited_mask)
+            """
+            
+            visited_mask_ = torch.ones(ntoken, self.max_node_size, dtype=torch.bool)
+            visited_mask_.masked_fill_(torch.triu(visited_mask_.new_ones(ntoken, self.max_node_size), diagonal=1), False)
+            _, indices = torch.sort(tsp_tour)
+            visited_mask_ = visited_mask_[:, indices]
+
+            self.visited_mask.append(visited_mask_)
         return
 
     def __len__(self):
         return len(self.tsp_instances)
 
     def __getitem__(self, idx):
-        return self.src[idx], self.tgt[idx], self.visited_mask[idx], self.ntokens[idx], self.tsp_tours[idx]
+        return self.src[idx], self.tgt[idx], self.tgt_y[idx], self.visited_mask[idx], self.ntokens[idx], self.tsp_tours[idx]
 
 
 def make_tgt_mask(tgt):
@@ -91,15 +97,18 @@ def make_tgt_mask(tgt):
 def collate_fn(batch):
     src = [ele[0] for ele in batch]
     tgt = [ele[1] for ele in batch]
-    visited_mask = [ele[2] for ele in batch]
-    ntokens = [ele[3] for ele in batch]
-    tsp_tours = [ele[4] for ele in batch]
+    tgt_y = [ele[2] for ele in batch]
+    visited_mask = [ele[3] for ele in batch]
+    ntokens = [ele[4] for ele in batch]
+    tsp_tours = [ele[5] for ele in batch]
 
     tgt = torch.stack(tgt, dim=0)
+    tgt_y = torch.stack(tgt_y, dim=0)
     
     return {
         "src": torch.stack(src, dim=0),
         "tgt": tgt,
+        "tgt_y": tgt_y,
         "visited_mask": torch.stack(visited_mask, dim=0),
         "ntokens": torch.stack(ntokens, dim=0),
         "tgt_mask": make_tgt_mask(tgt),
@@ -108,11 +117,9 @@ def collate_fn(batch):
 
 
 if __name__ == "__main__":
-    train_dataset = TSPDataset("./tsp20_test_concorde.txt")
-    train_dataloader = DataLoader(train_dataset, batch_size=4, shuffle=True, collate_fn=collate_fn)
+    train_dataset = TSPDataset("./sample.txt")
+    train_dataloader = DataLoader(train_dataset, batch_size=80, shuffle=False, collate_fn=collate_fn)
 
     for tsp_instances in tqdm(train_dataloader):
         for k, v in tsp_instances.items():
-            print(k, v.shape)
-        print()
-        break
+            pass
