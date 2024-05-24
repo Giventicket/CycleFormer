@@ -1,0 +1,7 @@
+__pycache__/
+logs/
+lightning_logs/
+*.txt
+*.ckpt
+configs/
+tsplib/
