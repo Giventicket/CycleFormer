@@ -23,6 +23,10 @@ Results on large-scale Random TSP.
 ### Pretrained Checkpoints
 *(To be uploaded)*
 
+### Train/Test datasets
+*(To be uploaded)*
+
+
 ### Build and Run Docker Container
 ```bash
 docker build -t cycleformer-image .
