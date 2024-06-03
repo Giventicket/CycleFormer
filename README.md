@@ -23,7 +23,8 @@ Results on large-scale Random TSP.
 - Torch 2.2.0+cu121
 
 ### Pretrained Checkpoints
-*(To be uploaded)*
+
+You can download the pretrained checkpoints from the following Dropbox link: [Pretrained Checkpoints](https://www.dropbox.com/scl/fo/esg0tp5avpvom1lk1s29c/AImvjtOZwtSnhqWMeQEaxsY?rlkey=69jiuaafx11n4veo6b81ryhpv&st=n6jctnxz&dl=0)
 
 ### Train/Test datasets
 *(To be uploaded)*
