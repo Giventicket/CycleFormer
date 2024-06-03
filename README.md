@@ -1,5 +1,7 @@
 # CycleFormer: TSP Solver Based on Language Modeling
 
+[![arXiv](https://img.shields.io/badge/arXiv-2405.20042-b31b1b.svg)](https://arxiv.org/abs/2405.20042)
+
 We introduce CycleFormer, a novel transformer model tailored specifically for the Traveling Salesman Problem (TSP). Unlike conventional transformer models designed for natural language processing, TSP presents unique challenges due to its dynamic and unlimited node set. To address this, we have innovatively integrated key elements into CycleFormer to harness the full potential of transformers for TSP.
 
 CycleFormer enhances the encoder-decoder interaction by directly connecting the encoder output with the decoder linear layer, thereby facilitating seamless information flow. Additionally, we have introduced positional encodings tailored to TSP's two-dimensional nature. The encoder tokens are equipped with positional encodings reflecting spatial coordinates, while circular positional encodings are employed for the decoder tokens to capture the cyclic properties of a tour.
