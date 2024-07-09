@@ -27,8 +27,7 @@ Results on large-scale Random TSP.
 You can download the pretrained checkpoints from the following Dropbox link: [Pretrained Checkpoints](https://www.dropbox.com/scl/fo/esg0tp5avpvom1lk1s29c/AImvjtOZwtSnhqWMeQEaxsY?rlkey=69jiuaafx11n4veo6b81ryhpv&st=n6jctnxz&dl=0)
 
 ### Train/Test datasets
-You can download the Train/Test datasets(TSP50, 100, 500, 1000, 10000) from the following Dropbox link: https://www.dropbox.com/scl/fo/tw6rjngvn6sxo1k75ddej/ALJNMyz8S5OVXyXEhftbom4?rlkey=zye153wnvgx2ivm7pwea6qbol&st=57ak1u28&dl=0
-*(To be uploaded)*
+You can download the Train/Test datasets(TSP50, 100, 500, 1000, 10000) from the following Dropbox link: [Train/Test datasets](https://www.dropbox.com/scl/fo/tw6rjngvn6sxo1k75ddej/ALJNMyz8S5OVXyXEhftbom4?rlkey=zye153wnvgx2ivm7pwea6qbol&st=umlwphc9&dl=0)
 
 
 ### Build and Run Docker Container
