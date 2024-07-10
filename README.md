@@ -33,7 +33,7 @@ You can download the Train/Test datasets(TSP50, 100, 500, 1000, 10000) from the 
 ### Build and Run Docker Container
 ```bash
 docker build -t cycleformer-image .
-docker run -it --gpus all --ipc host cycleformer-image
+docker run —ipc host —gpus all -it —rm —name cycleformer_container cycleformer_image
 ```
 
 ### Train Command
