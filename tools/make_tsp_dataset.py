@@ -10,12 +10,12 @@ import tqdm
 import os
 import glob
 
-import lkh
+# import lkh
 """
 wget http://akira.ruc.dk/~keld/research/LKH-3/LKH-3.0.6.tgz
 tar xvfz LKH-3.0.6.tgz
 cd LKH-3.0.6
-make
+make # make after amending some errors in the repository code
 sudo cp LKH /usr/local/bin
 """
 
