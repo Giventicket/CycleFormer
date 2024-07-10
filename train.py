@@ -9,7 +9,7 @@ def parse_arguments():
     parser.add_argument("--seed", type=int, default=1, help="Seed for random number generation.")
     parser.add_argument("--train_data_path", default="./tsp50_train_concorde.txt", help="Path to the training data.")
     parser.add_argument("--val_data_path", default="./tsp50_test_concorde.txt", help="Path to the validation data.")
-    parser.add_argument("--node_size", default=50, help="Node size for TSP instances")
+    parser.add_argument("--node_size", type=int, default=50, help="Node size for TSP instances")
     parser.add_argument("--train_batch_size", type=int, default=80, help="Batch size for training. [tsp50, tsp100, tsp500, tsp1000]: 80")
     parser.add_argument("--val_batch_size", type=int, default=1280, help="Batch size for validation. [tsp50, tsp100]: 1280, [tsp500, tsp1000]: 128")
     parser.add_argument("--test_batch_size", type=int, default=1280, help="Batch size for testing.")
