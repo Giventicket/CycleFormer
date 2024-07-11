@@ -13,8 +13,8 @@ RUN pip3 install torch==2.2.1 torchvision==0.17.1 torchaudio==2.2.1 --index-url 
     pip3 install tensorboard==2.16.2 && \
     pip3 install pytorch-lightning==2.1.2 && \
     pip3 install tsplib95 && \
-    pip3 install 'pyconcorde @ git+https://github.com/jvkersch/pyconcorde'
-    pip3 install flash-attn --no-build-isolation && \
+    pip3 install 'pyconcorde @ git+https://github.com/jvkersch/pyconcorde' && \
+    pip3 install flash-attn --no-build-isolation
 
 # install LKH solver, some errors in repository currently
 # RUN wget http://akira.ruc.dk/~keld/research/LKH-3/LKH-3.0.6.tgz && \
