@@ -248,12 +248,11 @@ class PositionalEncoding_2D(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
         
         self.d_model = d_model
-        self.d_model = self.d_model //2 
             
         # Compute the div_term once.
         div_term = 1 / torch.pow(
-            T, (2.0 * (torch.arange(self.d_model))) / torch.tensor(d_model*2)
-        )  # [batch_size, node_size, 128]
+            T, (2.0 * (torch.arange(self.d_model // 2))) / torch.tensor(self.d_model)
+        )  # [batch_size, node_size, 64]
         self.register_buffer("div_term", div_term)
 
     def forward(self, embeddings, graph):
@@ -263,8 +262,8 @@ class PositionalEncoding_2D(nn.Module):
         """
         batch_size, node_size, _ = graph.shape
         device = graph.device 
-        pe_x = torch.zeros(batch_size, node_size, self.d_model, device = device)  # [batch_size, node_size, 128]
-        pe_y = torch.zeros(batch_size, node_size, self.d_model, device = device)  # [batch_size, node_size, 128]
+        pe_x = torch.zeros(batch_size, node_size, self.d_model // 2, device = device)  # [batch_size, node_size, 64]
+        pe_y = torch.zeros(batch_size, node_size, self.d_model // 2, device = device)  # [batch_size, node_size, 64]
         
         xs = graph[:,:,0]
         ys = graph[:,:,1]
@@ -276,16 +275,16 @@ class PositionalEncoding_2D(nn.Module):
         
         b_term = ys.unsqueeze(-1) * self.div_term.repeat(
             batch_size, node_size, 1
-        )  # [batch_size, node_size, 128]
+        )  # [batch_size, node_size, 64]
         
         a_term = xs.unsqueeze(-1) * self.div_term.repeat(
             batch_size, node_size, 1
-        )  # [batch_size, node_size, 128]
+        )  # [batch_size, node_size, 64]
             
-        pe_x[:, :, 0::2] = torch.sin(a_term[:, :, 0::2])  # [batch_size, node_size, 32]
-        pe_x[:, :, 1::2] = torch.cos(a_term[:, :, 1::2])  # [batch_size, node_size, 32]
-        pe_y[:, :, 0::2] = torch.sin(b_term[:, :, 0::2])  # [batch_size, node_size, 32]
-        pe_y[:, :, 1::2] = torch.cos(b_term[:, :, 1::2])  # [batch_size, node_size, 32]
+        pe_x[:, :, 0::2] = torch.sin(a_term[:, :, 0::2])  # [batch_size, node_size, 64]
+        pe_x[:, :, 1::2] = torch.cos(a_term[:, :, 1::2])  # [batch_size, node_size, 64]
+        pe_y[:, :, 0::2] = torch.sin(b_term[:, :, 0::2])  # [batch_size, node_size, 64
+        pe_y[:, :, 1::2] = torch.cos(b_term[:, :, 1::2])  # [batch_size, node_size, 64]
         
         pe =pe = torch.cat([pe_x, pe_y], -1).requires_grad_(False)
         # [batch_size, node_size, 128]
